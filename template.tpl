@@ -284,9 +284,10 @@ const getCookieValues = require('getCookieValues');
 const getEventData = require('getEventData');
 const getRemoteAddress = require('getRemoteAddress');
 const makeTableMap = require('makeTableMap');
-
 const logToConsole = require('logToConsole');
 const getContainerVersion = require('getContainerVersion');
+const encodeUriComponent = require('encodeUriComponent');
+
 const containerVersion = getContainerVersion();
 const isDebug = containerVersion.debugMode;
 const isLoggingEnabled = determinateIsLoggingEnabled();
@@ -318,9 +319,9 @@ if (data.type === 'page_view') {
 
   let requestUrl =
     'https://' +
-    data.trackingDomain +
+    enc(data.trackingDomain) +
     '/v2/sitetracking/' +
-    data.trackingsetupid +
+    enc(data.trackingsetupid) +
     '/trackingpoints/';
   const requestBody = {
     name: data.name,
@@ -374,6 +375,11 @@ if (data.type === 'page_view') {
     },
     { method: 'POST', body: JSON.stringify([requestBody]) }
   );
+}
+
+function enc(data) {
+  data = data || '';
+  return encodeUriComponent(data);
 }
 
 function determinateIsLoggingEnabled() {
