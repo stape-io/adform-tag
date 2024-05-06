@@ -17,6 +17,10 @@ There are two configuration types that Adform tag includes: PageView and TrackEv
 - **Variables** - a table map of event variables that are sent to Adform API.
 - **Compliance** - pass information about the user's consent to the Adform API.
 
+### Useful links: 
+
+- https://stape.io/blog/adform-tag-for-server-side-google-tag-manager
+
 ## Open Source
 
 Adform Tag for GTM Server Side is developed and maintained by [Stape Team](https://stape.io/) under the Apache 2.0 license.
