@@ -328,13 +328,15 @@ if (data.type === 'page_view') {
     identity: {
       cookieId: adf_uid
     },
-    compliance: makeTableMap(data.compliance || [], 'key', 'value'),
     userContext: {
       userAgent: getRequestHeader('User-Agent'),
       userIp: getRemoteAddress()
-    },
-    variables: makeTableMap(data.variables || [], 'key', 'value')
+    }
   };
+  const compliance = makeTableMap(data.compliance || [], 'key', 'value');
+  if (compliance) requestBody.compliance = compliance;
+  const variables = makeTableMap(data.variables || [], 'key', 'value');
+  if (variables) requestBody.variables = variables;
 
   if (isLoggingEnabled) {
     logToConsole(
@@ -373,7 +375,8 @@ if (data.type === 'page_view') {
         data.gtmOnFailure();
       }
     },
-    { method: 'POST', body: JSON.stringify([requestBody]) }
+    { method: 'POST' },
+    JSON.stringify([requestBody])
   );
 }
 

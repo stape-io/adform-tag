@@ -1,5 +1,7 @@
 homepage: "https://stape.io/"
 versions:
+  - sha: 8588dfe772f9108caaa724b4f5606f5c5fdcba3b
+    changeNotes: Fix http request body, remove nullable fields from request.
   - sha: 77ad0232030e57866095c2916871fc6cb3af7e47
     changeNotes: Added url components encoding.
   - sha: dfab707b4642631b11bd8d00ad0a1cbba66b4f46
