@@ -231,6 +231,73 @@ ___TEMPLATE_PARAMETERS___
             "newRowButtonText": "Add variable"
           }
         ]
+      },
+      {
+        "type": "GROUP",
+        "name": "pageDataListGroup",
+        "displayName": "Page Data",
+        "groupStyle": "ZIPPY_CLOSED",
+        "subParams": [
+          {
+            "type": "TEXT",
+            "name": "pageLocation",
+            "displayName": "Page Location",
+            "simpleValueType": true
+          },
+          {
+            "type": "TEXT",
+            "name": "pageReferrer",
+            "displayName": "Page Referrer",
+            "simpleValueType": true
+          }
+        ]
+      },
+      {
+        "displayName": "User Data",
+        "name": "userDataListGroup",
+        "groupStyle": "ZIPPY_CLOSED",
+        "type": "GROUP",
+        "subParams": [
+          {
+            "name": "userDataList",
+            "simpleTableColumns": [
+              {
+                "valueValidators": [
+                  {
+                    "type": "NON_EMPTY"
+                  }
+                ],
+                "defaultValue": "name",
+                "displayName": "Property Name",
+                "name": "key",
+                "isUnique": true,
+                "type": "SELECT",
+                "selectItems": [
+                  {
+                    "value": "client_ip",
+                    "displayValue": "Client IP address"
+                  },
+                  {
+                    "value": "user_agent",
+                    "displayValue": "Client user agent"
+                  },
+                  {
+                    "value": "browser_language",
+                    "displayValue": "Client browser language"
+                  }
+                ]
+              },
+              {
+                "defaultValue": "",
+                "displayName": "Property Value",
+                "name": "value",
+                "type": "TEXT"
+              }
+            ],
+            "type": "SIMPLE_TABLE",
+            "newRowButtonText": "Add property"
+          }
+        ]
       }
     ],
     "enablingConditions": [
@@ -267,8 +334,7 @@ ___TEMPLATE_PARAMETERS___
         "simpleValueType": true,
         "defaultValue": "debug"
       }
-    ],
-    "enablingConditions": []
+    ]
   }
 ]
 
@@ -316,6 +382,7 @@ if (data.type === 'page_view') {
   data.gtmOnSuccess();
 } else {
   const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
+  const userData = makeTableMap(data.userDataList || [], 'key', 'value');
 
   let requestUrl =
     'https://' +
@@ -325,12 +392,15 @@ if (data.type === 'page_view') {
     '/trackingpoints/';
   const requestBody = {
     name: data.name,
+    pageUrl: data.pageLocation || getEventData('page_location'),
+    refererUrl: data.pageReferrer || getEventData('page_referrer'),
     identity: {
       cookieId: adf_uid
     },
     userContext: {
-      userAgent: getRequestHeader('User-Agent'),
-      userIp: getRemoteAddress()
+      userAgent: userData.user_agent || getRequestHeader('User-Agent'),
+      userIp: userData.client_ip || getRemoteAddress(),
+      browserLanguage: userData.browser_language || getEventData('language')
     }
   };
   const compliance = makeTableMap(data.compliance || [], 'key', 'value');
@@ -420,6 +490,14 @@ ___SERVER_PERMISSIONS___
               {
                 "type": 1,
                 "string": "page_location"
+              },
+              {
+                "type": 1,
+                "string": "page_referrer"
+              },
+              {
+                "type": 1,
+                "string": "language"
               }
             ]
           }

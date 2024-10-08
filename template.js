@@ -39,6 +39,7 @@ if (data.type === 'page_view') {
   data.gtmOnSuccess();
 } else {
   const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
+  const userData = makeTableMap(data.userDataList || [], 'key', 'value');
 
   let requestUrl =
     'https://' +
@@ -48,12 +49,15 @@ if (data.type === 'page_view') {
     '/trackingpoints/';
   const requestBody = {
     name: data.name,
+    pageUrl: data.pageLocation || getEventData('page_location'),
+    refererUrl: data.pageReferrer || getEventData('page_referrer'),
     identity: {
       cookieId: adf_uid
     },
     userContext: {
-      userAgent: getRequestHeader('User-Agent'),
-      userIp: getRemoteAddress()
+      userAgent: userData.user_agent || getRequestHeader('User-Agent'),
+      userIp: userData.client_ip || getRemoteAddress(),
+      browserLanguage: userData.browser_language || getEventData('language')
     }
   };
   const compliance = makeTableMap(data.compliance || [], 'key', 'value');
