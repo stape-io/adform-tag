@@ -1,5 +1,7 @@
 homepage: "https://stape.io/"
 versions:
+  - sha: 3e26c39bcd4cc3bef06039254cc990ee099dea7a
+    changeNotes: Added Page and User Data with Override options.
   - sha: 8588dfe772f9108caaa724b4f5606f5c5fdcba3b
     changeNotes: Fix http request body, remove nullable fields from request.
   - sha: 77ad0232030e57866095c2916871fc6cb3af7e47
