@@ -382,7 +382,7 @@ if (data.type === 'page_view') {
   data.gtmOnSuccess();
 } else {
   const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
-  const userData = makeTableMap(data.userDataList || [], 'key', 'value');
+  const userData = makeTableMap(data.userDataList || [], 'key', 'value') || '';
 
   let requestUrl =
     'https://' +
