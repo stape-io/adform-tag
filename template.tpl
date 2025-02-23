@@ -408,36 +408,28 @@ if (data.type === 'page_view') {
   const variables = makeTableMap(data.variables || [], 'key', 'value');
   if (variables) requestBody.variables = variables;
 
-  if (isLoggingEnabled) {
-    logToConsole(
-      JSON.stringify({
-        Name: 'Adform',
-        Type: 'Request',
-        TraceId: traceId,
-        EventName: data.name,
-        RequestMethod: 'POST',
-        RequestUrl: requestUrl,
-        RequestBody: requestBody
-      })
-    );
-  }
+  log({
+    Name: 'Adform',
+    Type: 'Request',
+    TraceId: traceId,
+    EventName: data.name,
+    RequestMethod: 'POST',
+    RequestUrl: requestUrl,
+    RequestBody: requestBody
+  });
 
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      if (isLoggingEnabled) {
-        logToConsole(
-          JSON.stringify({
-            Name: 'Adform',
-            Type: 'Response',
-            TraceId: traceId,
-            EventName: data.name,
-            ResponseStatusCode: statusCode,
-            ResponseHeaders: headers,
-            ResponseBody: body
-          })
-        );
-      }
+      log({
+        Name: 'Adform',
+        Type: 'Response',
+        TraceId: traceId,
+        EventName: data.name,
+        ResponseStatusCode: statusCode,
+        ResponseHeaders: headers,
+        ResponseBody: body
+      });
 
       if (statusCode >= 200 && statusCode < 300) {
         data.gtmOnSuccess();
@@ -455,7 +447,19 @@ function enc(data) {
   return encodeUriComponent(data);
 }
 
+function log(logObject) {
+  if (isLoggingEnabled) {
+    logToConsole(JSON.stringify(logObject));
+  }
+}
+
 function determinateIsLoggingEnabled() {
+  const containerVersion = getContainerVersion();
+  const isDebug = !!(
+    containerVersion &&
+    (containerVersion.debugMode || containerVersion.previewMode)
+  );
+
   if (!data.logType) {
     return isDebug;
   }
