@@ -1,6 +1,6 @@
 homepage: "https://stape.io/"
 versions:
-  - sha: a991adae28a4f729259a16e8392aeabd7a1d01eb
+  - sha: 7c7662c43f95b06ded50179eb90faa681db295d3
     changeNotes: Fixed error with user_agent if it is not set.
   - sha: 3e26c39bcd4cc3bef06039254cc990ee099dea7a
     changeNotes: Added Page and User Data with Override options.
