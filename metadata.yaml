@@ -1,4 +1,5 @@
 homepage: 'https://stape.io/'
+documentation: 'https://github.com/stape-io/adform-tag'
 versions:
   - sha: 9a7a178179cc0f190c70d22e9524ec8f51b01f74
     changeNotes: Update to tag execution consent settings section.
