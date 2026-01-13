@@ -1,20 +1,29 @@
-﻿const sendHttpRequest = require('sendHttpRequest');
-const setCookie = require('setCookie');
-const parseUrl = require('parseUrl');
-const JSON = require('JSON');
-const getRequestHeader = require('getRequestHeader');
-const getCookieValues = require('getCookieValues');
+﻿const encodeUriComponent = require('encodeUriComponent');
+const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
-const getRemoteAddress = require('getRemoteAddress');
-const makeTableMap = require('makeTableMap');
-const logToConsole = require('logToConsole');
+const getCookieValues = require('getCookieValues');
 const getContainerVersion = require('getContainerVersion');
-const encodeUriComponent = require('encodeUriComponent');
+const getRemoteAddress = require('getRemoteAddress');
+const getRequestHeader = require('getRequestHeader');
+const getType = require('getType');
+const JSON = require('JSON');
+const logToConsole = require('logToConsole');
+const makeString = require('makeString');
+const makeTableMap = require('makeTableMap');
+const parseUrl = require('parseUrl');
+const sendHttpRequest = require('sendHttpRequest');
+const setCookie = require('setCookie');
 
-const containerVersion = getContainerVersion();
-const isDebug = containerVersion.debugMode;
+/*==============================================================================
+==============================================================================*/
+
 const isLoggingEnabled = determinateIsLoggingEnabled();
 const traceId = getRequestHeader('trace-id');
+const eventData = getAllEventData();
+
+if (!isConsentGivenOrNotRequired(data, eventData)) {
+  return data.gtmOnSuccess();
+}
 
 if (data.type === 'page_view') {
   const url = getEventData('page_location') || getRequestHeader('referer');
@@ -99,9 +108,20 @@ if (data.type === 'page_view') {
   );
 }
 
+/*==============================================================================
+Helpers
+==============================================================================*/
+
+function isConsentGivenOrNotRequired(data, eventData) {
+  if (data.adStorageConsent !== 'required') return true;
+  if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
+  const xGaGcs = eventData['x-ga-gcs'] || ''; // x-ga-gcs is a string like "G110"
+  return xGaGcs[2] === '1';
+}
+
 function enc(data) {
-  data = data || '';
-  return encodeUriComponent(data);
+  if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
+  return encodeUriComponent(makeString(data));
 }
 
 function log(logObject) {
