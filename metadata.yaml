@@ -1,5 +1,7 @@
-homepage: "https://stape.io/"
+homepage: 'https://stape.io/'
 versions:
+  - sha: 9a7a178179cc0f190c70d22e9524ec8f51b01f74
+    changeNotes: Update to tag execution consent settings section.
   - sha: 7c7662c43f95b06ded50179eb90faa681db295d3
     changeNotes: Fixed error with user_agent if it is not set.
   - sha: 3e26c39bcd4cc3bef06039254cc990ee099dea7a
