@@ -29,8 +29,9 @@ if (data.type === 'page_view') {
   const url = getEventData('page_location') || getRequestHeader('referer');
 
   if (url) {
-    const cookieId = parseUrl(url).searchParams[data.clickIdParameterName];
-    const clickId = parseUrl(url).searchParams[data.adformClickIdParameterName];
+    const searchParams = parseUrl(url).searchParams;
+    const cookieId = searchParams[data.clickIdParameterName || 'adfcookieid']; // Also know as "Adform third-party cookie ID"
+    const clickId = searchParams[data.adformClickIdParameterName || 'adfcd'];
 
     if (cookieId || clickId) {
       const options = {
@@ -44,13 +45,13 @@ if (data.type === 'page_view') {
       if (clickId) setCookie('_adfcd', clickId, options, false);
     }
   }
-  data.gtmOnSuccess();
+  return data.gtmOnSuccess();
 } else {
-  const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
+  const adf_uid = data.clickId || getCookieValues('adfuid')[0] || ''; // Also know as "Adform third-party cookie ID"
   const adf_cd = data.adformClickId || getCookieValues('_adfcd')[0] || '';
   const userData = makeTableMap(data.userDataList || [], 'key', 'value') || {};
 
-  let requestUrl =
+  const requestUrl =
     'https://' +
     enc(data.trackingDomain) +
     '/v2/sitetracking/' +
@@ -70,6 +71,10 @@ if (data.type === 'page_view') {
       browserLanguage: userData.browser_language || getEventData('language')
     }
   };
+  const mobileDeviceId = data.mobileAdvertisingId || eventData['x-ga-resettable_device_id'];
+  if (mobileDeviceId && mobileDeviceId !== '00000000-0000-0000-0000-000000000000') {
+    requestBody.identity.advertisingId = mobileDeviceId;
+  }
   const compliance = makeTableMap(data.compliance || [], 'key', 'value');
   if (compliance) requestBody.compliance = compliance;
   const variables = makeTableMap(data.variables || [], 'key', 'value');
@@ -99,12 +104,12 @@ if (data.type === 'page_view') {
       });
 
       if (statusCode >= 200 && statusCode < 300) {
-        data.gtmOnSuccess();
+        return data.gtmOnSuccess();
       } else {
-        data.gtmOnFailure();
+        return data.gtmOnFailure();
       }
     },
-    { method: 'POST' },
+    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     JSON.stringify([requestBody])
   );
 }
