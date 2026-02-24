@@ -1,7 +1,7 @@
 homepage: 'https://stape.io/'
 documentation: 'https://github.com/stape-io/adform-tag'
 versions:
-  - sha: 4a6a91d174650f0e5d5ccd6882e3254b094ad05b
+  - sha: bcd6bcb5afb80b7d5e2878728d645b90b6c9a4e5
     changeNotes: Add support to adfcd click identifier.
   - sha: f3d52506e4a3486a7fcbfce5432128809a068cc3
     changeNotes: Update to tag execution consent settings section.
