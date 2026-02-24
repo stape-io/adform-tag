@@ -29,25 +29,25 @@ if (data.type === 'page_view') {
   const url = getEventData('page_location') || getRequestHeader('referer');
 
   if (url) {
-    const value = parseUrl(url).searchParams[data.clickIdParameterName];
+    const cookieId = parseUrl(url).searchParams[data.clickIdParameterName];
+    const clickId = parseUrl(url).searchParams[data.adformClickIdParameterName];
 
-    if (value) {
+    if (cookieId || clickId) {
       const options = {
         domain: 'auto',
         path: '/',
         secure: true,
         httpOnly: false
       };
-
       if (data.expiration > 0) options['max-age'] = data.expiration;
-
-      setCookie('adfuid', value, options, false);
+      if (cookieId) setCookie('adfuid', cookieId, options, false);
+      if (clickId) setCookie('_adfcd', clickId, options, false);
     }
   }
-
   data.gtmOnSuccess();
 } else {
   const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
+  const adf_cd = data.adformClickId || getCookieValues('_adfcd')[0] || '';
   const userData = makeTableMap(data.userDataList || [], 'key', 'value') || {};
 
   let requestUrl =
@@ -61,7 +61,8 @@ if (data.type === 'page_view') {
     pageUrl: data.pageLocation || getEventData('page_location'),
     refererUrl: data.pageReferrer || getEventData('page_referrer'),
     identity: {
-      cookieId: adf_uid
+      cookieId: adf_uid,
+      clickId: adf_cd
     },
     userContext: {
       userAgent: userData.user_agent || getRequestHeader('User-Agent'),

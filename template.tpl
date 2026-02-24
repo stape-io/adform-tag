@@ -30,65 +30,93 @@ ___TEMPLATE_PARAMETERS___
 
 [
   {
-    "type": "RADIO",
-    "name": "type",
-    "displayName": "Event Type",
-    "radioItems": [
+    "type": "GROUP",
+    "name": "configGroup",
+    "displayName": "",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
       {
-        "value": "page_view",
-        "displayValue": "PageView"
+        "type": "RADIO",
+        "name": "type",
+        "displayName": "Event Type",
+        "radioItems": [
+          {
+            "value": "page_view",
+            "displayValue": "PageView"
+          },
+          {
+            "value": "trackEvent",
+            "displayValue": "TrackEvent"
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": "page_view",
+        "help": "\u003cb\u003ePageView\u003c/b\u003e - stores the {adfcookieid} URL parameter inside the adfuid cookie\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eTrackEvent\u003c/b\u003e - Send tracking request to the Adform"
       },
       {
-        "value": "trackEvent",
-        "displayValue": "TrackEvent"
-      }
-    ],
-    "simpleValueType": true,
-    "defaultValue": "page_view",
-    "help": "\u003cb\u003ePageView\u003c/b\u003e - stores the {adfcookieid} URL parameter inside the adfuid cookie\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eTrackEvent\u003c/b\u003e - Send tracking request to the Adform"
-  },
-  {
-    "type": "TEXT",
-    "name": "clickIdParameterName",
-    "displayName": "Url parameter name for adfcookieid",
-    "simpleValueType": true,
-    "valueValidators": [
-      {
-        "type": "NON_EMPTY"
-      }
-    ],
-    "enablingConditions": [
-      {
-        "paramName": "type",
-        "paramValue": "page_view",
-        "type": "EQUALS"
-      }
-    ],
-    "help": "More info about adfcookieid can be found in the Adform \u003ca href\u003d\"https://www.adformhelp.com/hc/en-us/articles/9740579489041-Use-Server-Side-Tracking#UUID-8913ffd2-24c4-09ed-4ee9-55c2bec39e73_bridgehead-idm4592332927937632962103834301\" target\u003d\"_blank\"\u003edocumentation\u003c/a\u003e.",
-    "defaultValue": "adfcookieid"
-  },
-  {
-    "type": "TEXT",
-    "name": "expiration",
-    "displayName": "Expiration time for the adfuid cookie in seconds.",
-    "simpleValueType": true,
-    "enablingConditions": [
-      {
-        "paramName": "type",
-        "paramValue": "page_view",
-        "type": "EQUALS"
-      }
-    ],
-    "valueValidators": [
-      {
-        "type": "NON_EMPTY"
+        "type": "TEXT",
+        "name": "clickIdParameterName",
+        "displayName": "Url parameter name for adfcookieid (Cookie ID)",
+        "simpleValueType": true,
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          }
+        ],
+        "enablingConditions": [
+          {
+            "paramName": "type",
+            "paramValue": "page_view",
+            "type": "EQUALS"
+          }
+        ],
+        "help": "More info about adfcookieid can be found in the Adform \u003ca href\u003d\"https://www.adformhelp.com/hc/en-us/articles/9740579489041-Use-Server-Side-Tracking#UUID-8913ffd2-24c4-09ed-4ee9-55c2bec39e73_bridgehead-idm4592332927937632962103834301\" target\u003d\"_blank\"\u003edocumentation\u003c/a\u003e.",
+        "defaultValue": "adfcookieid"
       },
       {
-        "type": "NON_NEGATIVE_NUMBER"
+        "type": "TEXT",
+        "name": "adformClickIdParameterName",
+        "displayName": "Url parameter name for adfcd (Click ID)",
+        "simpleValueType": true,
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          }
+        ],
+        "enablingConditions": [
+          {
+            "paramName": "type",
+            "paramValue": "page_view",
+            "type": "EQUALS"
+          }
+        ],
+        "help": "More info about adfcd can be found in the Adform \u003ca href\u003d\"https://stape.io/blog/adform-tag-for-server-side-google-tag-manager\" target\u003d\"_blank\"\u003edocumentation\u003c/a\u003e.",
+        "defaultValue": "adfcd"
+      },
+      {
+        "type": "TEXT",
+        "name": "expiration",
+        "displayName": "Expiration time for the adfuid cookie in seconds.",
+        "simpleValueType": true,
+        "enablingConditions": [
+          {
+            "paramName": "type",
+            "paramValue": "page_view",
+            "type": "EQUALS"
+          }
+        ],
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          },
+          {
+            "type": "NON_NEGATIVE_NUMBER"
+          }
+        ],
+        "defaultValue": 2592000,
+        "help": "One month by default. Use 0 for saving only for the session."
       }
-    ],
-    "defaultValue": 2592000,
-    "help": "One month by default. Use 0 for saving only for the session."
+    ]
   },
   {
     "type": "GROUP",
@@ -135,6 +163,12 @@ ___TEMPLATE_PARAMETERS___
         "type": "TEXT",
         "name": "clickId",
         "displayName": "Adform cookie ID (optional)",
+        "simpleValueType": true
+      },
+      {
+        "type": "TEXT",
+        "name": "adformClickId",
+        "displayName": "Adform Click ID (optional)",
         "simpleValueType": true
       },
       {
@@ -397,25 +431,25 @@ if (data.type === 'page_view') {
   const url = getEventData('page_location') || getRequestHeader('referer');
 
   if (url) {
-    const value = parseUrl(url).searchParams[data.clickIdParameterName];
+    const cookieId = parseUrl(url).searchParams[data.clickIdParameterName];
+    const clickId = parseUrl(url).searchParams[data.adformClickIdParameterName];
 
-    if (value) {
+    if (cookieId || clickId) {
       const options = {
         domain: 'auto',
         path: '/',
         secure: true,
         httpOnly: false
       };
-
       if (data.expiration > 0) options['max-age'] = data.expiration;
-
-      setCookie('adfuid', value, options, false);
+      if (cookieId) setCookie('adfuid', cookieId, options, false);
+      if (clickId) setCookie('_adfcd', clickId, options, false);
     }
   }
-
   data.gtmOnSuccess();
 } else {
   const adf_uid = data.clickId || getCookieValues('adfuid')[0] || '';
+  const adf_cd = data.adformClickId || getCookieValues('_adfcd')[0] || '';
   const userData = makeTableMap(data.userDataList || [], 'key', 'value') || {};
 
   let requestUrl =
@@ -429,7 +463,8 @@ if (data.type === 'page_view') {
     pageUrl: data.pageLocation || getEventData('page_location'),
     refererUrl: data.pageReferrer || getEventData('page_referrer'),
     identity: {
-      cookieId: adf_uid
+      cookieId: adf_uid,
+      clickId: adf_cd
     },
     userContext: {
       userAgent: userData.user_agent || getRequestHeader('User-Agent'),
@@ -624,6 +659,53 @@ ___SERVER_PERMISSIONS___
                     "string": "any"
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "adfcd"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
               }
             ]
           }
@@ -789,6 +871,10 @@ ___SERVER_PERMISSIONS___
               {
                 "type": 1,
                 "string": "adfuid"
+              },
+              {
+                "type": 1,
+                "string": "adfcd"
               }
             ]
           }
