@@ -28,3 +28,6 @@ There are two configuration types that Adform tag includes: PageView and TrackEv
 ## Open Source
 
 Adform Tag for GTM Server Side is developed and maintained by [Stape Team](https://stape.io/) under the Apache 2.0 license.
+
+### GTM Gallery Status
+🟢 [Listed](https://tagmanager.google.com/gallery/#/owners/stape-io/templates/adform-tag)
