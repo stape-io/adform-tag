@@ -2,12 +2,10 @@
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
 const getCookieValues = require('getCookieValues');
-const getContainerVersion = require('getContainerVersion');
 const getRemoteAddress = require('getRemoteAddress');
 const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
 const JSON = require('JSON');
-const logToConsole = require('logToConsole');
 const makeString = require('makeString');
 const makeTableMap = require('makeTableMap');
 const parseUrl = require('parseUrl');
@@ -17,8 +15,6 @@ const setCookie = require('setCookie');
 /*==============================================================================
 ==============================================================================*/
 
-const isLoggingEnabled = determinateIsLoggingEnabled();
-const traceId = getRequestHeader('trace-id');
 const eventData = getAllEventData();
 
 if (!isConsentGivenOrNotRequired(data, eventData)) {
@@ -80,29 +76,9 @@ if (data.type === 'page_view') {
   const variables = makeTableMap(data.variables || [], 'key', 'value');
   if (variables) requestBody.variables = variables;
 
-  log({
-    Name: 'Adform',
-    Type: 'Request',
-    TraceId: traceId,
-    EventName: data.name,
-    RequestMethod: 'POST',
-    RequestUrl: requestUrl,
-    RequestBody: requestBody
-  });
-
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      log({
-        Name: 'Adform',
-        Type: 'Response',
-        TraceId: traceId,
-        EventName: data.name,
-        ResponseStatusCode: statusCode,
-        ResponseHeaders: headers,
-        ResponseBody: body
-      });
-
       if (statusCode >= 200 && statusCode < 300) {
         return data.gtmOnSuccess();
       } else {
@@ -128,32 +104,4 @@ function isConsentGivenOrNotRequired(data, eventData) {
 function enc(data) {
   if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
   return encodeUriComponent(makeString(data));
-}
-
-function log(logObject) {
-  if (isLoggingEnabled) {
-    logToConsole(JSON.stringify(logObject));
-  }
-}
-
-function determinateIsLoggingEnabled() {
-  const containerVersion = getContainerVersion();
-  const isDebug = !!(
-    containerVersion &&
-    (containerVersion.debugMode || containerVersion.previewMode)
-  );
-
-  if (!data.logType) {
-    return isDebug;
-  }
-
-  if (data.logType === 'no') {
-    return false;
-  }
-
-  if (data.logType === 'debug') {
-    return isDebug;
-  }
-
-  return data.logType === 'always';
 }

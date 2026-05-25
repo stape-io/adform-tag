@@ -352,34 +352,6 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "GROUP",
-    "name": "logsGroup",
-    "displayName": "Logs Settings",
-    "groupStyle": "ZIPPY_CLOSED",
-    "subParams": [
-      {
-        "type": "RADIO",
-        "name": "logType",
-        "radioItems": [
-          {
-            "value": "no",
-            "displayValue": "Do not log"
-          },
-          {
-            "value": "debug",
-            "displayValue": "Log to console during debug and preview"
-          },
-          {
-            "value": "always",
-            "displayValue": "Always log to console"
-          }
-        ],
-        "simpleValueType": true,
-        "defaultValue": "debug"
-      }
-    ]
-  },
-  {
-    "type": "GROUP",
     "name": "tagExecutionConsentSettingsGroup",
     "displayName": "Tag Execution Consent Settings",
     "groupStyle": "ZIPPY_CLOSED",
@@ -412,12 +384,10 @@ const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
 const getCookieValues = require('getCookieValues');
-const getContainerVersion = require('getContainerVersion');
 const getRemoteAddress = require('getRemoteAddress');
 const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
 const JSON = require('JSON');
-const logToConsole = require('logToConsole');
 const makeString = require('makeString');
 const makeTableMap = require('makeTableMap');
 const parseUrl = require('parseUrl');
@@ -427,8 +397,6 @@ const setCookie = require('setCookie');
 /*==============================================================================
 ==============================================================================*/
 
-const isLoggingEnabled = determinateIsLoggingEnabled();
-const traceId = getRequestHeader('trace-id');
 const eventData = getAllEventData();
 
 if (!isConsentGivenOrNotRequired(data, eventData)) {
@@ -490,29 +458,9 @@ if (data.type === 'page_view') {
   const variables = makeTableMap(data.variables || [], 'key', 'value');
   if (variables) requestBody.variables = variables;
 
-  log({
-    Name: 'Adform',
-    Type: 'Request',
-    TraceId: traceId,
-    EventName: data.name,
-    RequestMethod: 'POST',
-    RequestUrl: requestUrl,
-    RequestBody: requestBody
-  });
-
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      log({
-        Name: 'Adform',
-        Type: 'Response',
-        TraceId: traceId,
-        EventName: data.name,
-        ResponseStatusCode: statusCode,
-        ResponseHeaders: headers,
-        ResponseBody: body
-      });
-
       if (statusCode >= 200 && statusCode < 300) {
         return data.gtmOnSuccess();
       } else {
@@ -538,34 +486,6 @@ function isConsentGivenOrNotRequired(data, eventData) {
 function enc(data) {
   if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
   return encodeUriComponent(makeString(data));
-}
-
-function log(logObject) {
-  if (isLoggingEnabled) {
-    logToConsole(JSON.stringify(logObject));
-  }
-}
-
-function determinateIsLoggingEnabled() {
-  const containerVersion = getContainerVersion();
-  const isDebug = !!(
-    containerVersion &&
-    (containerVersion.debugMode || containerVersion.previewMode)
-  );
-
-  if (!data.logType) {
-    return isDebug;
-  }
-
-  if (data.logType === 'no') {
-    return false;
-  }
-
-  if (data.logType === 'debug') {
-    return isDebug;
-  }
-
-  return data.logType === 'always';
 }
 
 
@@ -753,21 +673,6 @@ ___SERVER_PERMISSIONS___
                 "mapValue": [
                   {
                     "type": 1,
-                    "string": "trace-id"
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "headerName"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
                     "string": "referer"
                   }
                 ]
@@ -898,37 +803,6 @@ ___SERVER_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "logging",
-        "versionId": "1"
-      },
-      "param": [
-        {
-          "key": "environments",
-          "value": {
-            "type": 1,
-            "string": "all"
-          }
-        }
-      ]
-    },
-    "clientAnnotations": {
-      "isEditedByUser": true
-    },
-    "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "read_container_data",
-        "versionId": "1"
-      },
-      "param": []
-    },
-    "isRequired": true
   }
 ]
 
@@ -940,6 +814,8 @@ scenarios: []
 
 ___NOTES___
 
-Created on 10/11/2021, 09:29:27
+2026-05-25 Change Notes:
+ - Logging removal.
 
+Created on 10/11/2021, 09:29:27
 
