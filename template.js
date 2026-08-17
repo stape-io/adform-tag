@@ -1,4 +1,5 @@
-﻿const encodeUriComponent = require('encodeUriComponent');
+﻿const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
+const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
 const getCookieValues = require('getCookieValues');
@@ -17,12 +18,10 @@ const setCookie = require('setCookie');
 
 const eventData = getAllEventData();
 
-if (!isConsentGivenOrNotRequired(data, eventData)) {
-  return data.gtmOnSuccess();
-}
+if (shouldExitEarly(data, eventData)) return;
 
 if (data.type === 'page_view') {
-  const url = getEventData('page_location') || getRequestHeader('referer');
+  const url = getUrl(eventData);
 
   if (url) {
     const searchParams = parseUrl(url).searchParams;
@@ -31,8 +30,9 @@ if (data.type === 'page_view') {
 
     if (cookieId || clickId) {
       const options = {
-        domain: 'auto',
+        domain: getCookieDomain(data.cookieDomain),
         path: '/',
+        samesite: data.cookieSameSite || 'none',
         secure: true,
         httpOnly: false
       };
@@ -94,6 +94,25 @@ if (data.type === 'page_view') {
 Helpers
 ==============================================================================*/
 
+function getUrl(eventData) {
+  return eventData.page_location || getRequestHeader('referer') || eventData.page_referrer;
+}
+
+function shouldExitEarly(data, eventData) {
+  if (!isConsentGivenOrNotRequired(data, eventData)) {
+    data.gtmOnSuccess();
+    return true;
+  }
+
+  const url = getUrl(eventData);
+  if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
+    data.gtmOnSuccess();
+    return true;
+  }
+
+  return false;
+}
+
 function isConsentGivenOrNotRequired(data, eventData) {
   if (data.adStorageConsent !== 'required') return true;
   if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
@@ -104,4 +123,11 @@ function isConsentGivenOrNotRequired(data, eventData) {
 function enc(data) {
   if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
   return encodeUriComponent(makeString(data));
+}
+
+function getCookieDomain(defaultCookieDomain) {
+  return !defaultCookieDomain || defaultCookieDomain === 'auto'
+    ? computeEffectiveTldPlusOne(getEventData('page_location') || getRequestHeader('referer')) ||
+        'auto'
+    : defaultCookieDomain;
 }

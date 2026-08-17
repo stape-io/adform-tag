@@ -92,27 +92,73 @@ ___TEMPLATE_PARAMETERS___
         "defaultValue": "adfcd"
       },
       {
-        "type": "TEXT",
-        "name": "expiration",
-        "displayName": "Expiration time for the cookie in seconds",
-        "simpleValueType": true,
+        "type": "GROUP",
+        "name": "cookieSettingsGroup",
+        "subParams": [
+          {
+            "type": "TEXT",
+            "name": "cookieDomain",
+            "displayName": "Cookie Domain",
+            "simpleValueType": true,
+            "valueHint": "example.com",
+            "help": "Use this option to override the cookie domain. \n\u003cbr\u003e \nEnter your website\u0027s top-level domain as a fixed value (e.g., example.com). \n\u003cbr\u003e\n If left empty or using the \"auto\" value, the domain will be automatically determined using the following priority: \u003cul\u003e \n\u003cli\u003eDomain of the \u003ci\u003epage_location\u003c/i\u003e Event Data parameter (if present).\u003c/li\u003e\n\u003cli\u003eDomain of the \u003ci\u003eReferer\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eDomain of the \u003ci\u003eForwarded\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eDomain of the \u003ci\u003eX-Forwarded-Host\u003c/i\u003e header (if present).\u003c/li\u003e\n\u003cli\u003eDomain of the \u003ci\u003eHost\u003c/i\u003e header.\u003c/li\u003e\n\u003c/ul\u003e",
+            "defaultValue": "auto",
+            "valueValidators": [
+              {
+                "type": "NON_EMPTY"
+              }
+            ]
+          },
+          {
+            "type": "SELECT",
+            "name": "cookieSameSite",
+            "displayName": "Cookie SameSite",
+            "macrosInSelect": false,
+            "selectItems": [
+              {
+                "value": "none",
+                "displayValue": "None"
+              },
+              {
+                "value": "lax",
+                "displayValue": "Lax"
+              },
+              {
+                "value": "strict",
+                "displayValue": "Strict"
+              }
+            ],
+            "simpleValueType": true,
+            "help": "\u003ca href\u003d\"https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#samesitesamesite-value\"\u003eLearn more\u003c/a\u003e.",
+            "defaultValue": "none"
+          },
+          {
+            "type": "TEXT",
+            "name": "expiration",
+            "displayName": "Expiration time for the cookie in seconds",
+            "simpleValueType": true,
+            "valueValidators": [
+              {
+                "type": "NON_EMPTY"
+              },
+              {
+                "type": "NON_NEGATIVE_NUMBER"
+              }
+            ],
+            "defaultValue": 5184000,
+            "help": "60 days (5184000 seconds), by default. Use 0 for saving only for the session.",
+            "valueUnit": "seconds"
+          }
+        ],
+        "displayName": "Cookies Settings",
+        "groupStyle": "ZIPPY_OPEN_ON_PARAM",
         "enablingConditions": [
           {
             "paramName": "type",
             "paramValue": "page_view",
             "type": "EQUALS"
           }
-        ],
-        "valueValidators": [
-          {
-            "type": "NON_EMPTY"
-          },
-          {
-            "type": "NON_NEGATIVE_NUMBER"
-          }
-        ],
-        "defaultValue": 2592000,
-        "help": "One month by default. Use 0 for saving only for the session."
+        ]
       }
     ]
   },
@@ -380,6 +426,7 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
+const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
 const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
@@ -399,12 +446,10 @@ const setCookie = require('setCookie');
 
 const eventData = getAllEventData();
 
-if (!isConsentGivenOrNotRequired(data, eventData)) {
-  return data.gtmOnSuccess();
-}
+if (shouldExitEarly(data, eventData)) return;
 
 if (data.type === 'page_view') {
-  const url = getEventData('page_location') || getRequestHeader('referer');
+  const url = getUrl(eventData);
 
   if (url) {
     const searchParams = parseUrl(url).searchParams;
@@ -413,8 +458,9 @@ if (data.type === 'page_view') {
 
     if (cookieId || clickId) {
       const options = {
-        domain: 'auto',
+        domain: getCookieDomain(data.cookieDomain),
         path: '/',
+        samesite: data.cookieSameSite || 'none',
         secure: true,
         httpOnly: false
       };
@@ -476,6 +522,25 @@ if (data.type === 'page_view') {
 Helpers
 ==============================================================================*/
 
+function getUrl(eventData) {
+  return eventData.page_location || getRequestHeader('referer') || eventData.page_referrer;
+}
+
+function shouldExitEarly(data, eventData) {
+  if (!isConsentGivenOrNotRequired(data, eventData)) {
+    data.gtmOnSuccess();
+    return true;
+  }
+
+  const url = getUrl(eventData);
+  if (url && url.lastIndexOf('https://gtm-msr.appspot.com/', 0) === 0) {
+    data.gtmOnSuccess();
+    return true;
+  }
+
+  return false;
+}
+
 function isConsentGivenOrNotRequired(data, eventData) {
   if (data.adStorageConsent !== 'required') return true;
   if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
@@ -486,6 +551,13 @@ function isConsentGivenOrNotRequired(data, eventData) {
 function enc(data) {
   if (['null', 'undefined'].indexOf(getType(data)) !== -1) data = '';
   return encodeUriComponent(makeString(data));
+}
+
+function getCookieDomain(defaultCookieDomain) {
+  return !defaultCookieDomain || defaultCookieDomain === 'auto'
+    ? computeEffectiveTldPlusOne(getEventData('page_location') || getRequestHeader('referer')) ||
+        'auto'
+    : defaultCookieDomain;
 }
 
 
@@ -813,6 +885,10 @@ scenarios: []
 
 
 ___NOTES___
+
+2026-08-17 Change Notes:
+ - Added more controls to cookie settings (SameSite and Domain).
+ - Increase the default cookie expiration from 30 days to 60 days.
 
 2026-05-25 Change Notes:
  - Logging removal.
