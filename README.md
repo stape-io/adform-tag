@@ -24,6 +24,7 @@ There are two configuration types that Adform tag includes: PageView and TrackEv
 ### Useful Resources
 
 - [Adform tag for server-side Google Tag Manager](https://stape.io/blog/adform-tag-for-server-side-google-tag-manager)
+- [Adform Cookie Retrieval Script tag for Google Tag Manager Web](https://github.com/stape-io/adform-cookie-retrieval-script-web-tag) - captures the `adfuid` cookie client-side so it can be used as input for this server-side tag.
 
 ## Open Source
 
