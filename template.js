@@ -3,7 +3,6 @@ const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
 const getCookieValues = require('getCookieValues');
-const getRemoteAddress = require('getRemoteAddress');
 const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
 const JSON = require('JSON');
@@ -37,14 +36,14 @@ if (data.type === 'page_view') {
         httpOnly: false
       };
       if (data.expiration > 0) options['max-age'] = data.expiration;
-      if (cookieId) setCookie('adfuid', cookieId, options, false);
-      if (clickId) setCookie('_adfcd', clickId, options, false);
+      if (isCookieIdValid(cookieId)) setCookie('adfuid', cookieId, options, false);
+      if (isClickIdValid(clickId)) setCookie('_adfcd', clickId, options, false);
     }
   }
   return data.gtmOnSuccess();
 } else {
-  const adf_uid = data.clickId || getCookieValues('adfuid')[0] || ''; // Also know as "Adform third-party cookie ID"
-  const adf_cd = data.adformClickId || getCookieValues('_adfcd')[0] || '';
+  const cookieId = data.clickId || getCookieValues('adfuid')[0] || ''; // Also know as "Adform third-party cookie ID"
+  const clickId = data.adformClickId || getCookieValues('_adfcd')[0] || '';
   const userData = makeTableMap(data.userDataList || [], 'key', 'value') || {};
 
   const requestUrl =
@@ -55,16 +54,16 @@ if (data.type === 'page_view') {
     '/trackingpoints/';
   const requestBody = {
     name: data.name,
-    pageUrl: data.pageLocation || getEventData('page_location'),
-    refererUrl: data.pageReferrer || getEventData('page_referrer'),
+    pageUrl: data.pageLocation || eventData.page_location,
+    refererUrl: data.pageReferrer || eventData.page_referrer,
     identity: {
-      cookieId: adf_uid,
-      clickId: adf_cd
+      cookieId: isCookieIdValid(cookieId) ? cookieId : '',
+      clickId: isClickIdValid(clickId) ? clickId : ''
     },
     userContext: {
-      userAgent: userData.user_agent || getRequestHeader('User-Agent'),
-      userIp: userData.client_ip || getRemoteAddress(),
-      browserLanguage: userData.browser_language || getEventData('language')
+      userAgent: userData.user_agent || eventData.user_agent,
+      userIp: userData.client_ip || eventData.ip_override,
+      browserLanguage: userData.browser_language || eventData.language
     }
   };
   const mobileDeviceId = data.mobileAdvertisingId || eventData['x-ga-resettable_device_id'];
@@ -79,15 +78,23 @@ if (data.type === 'page_view') {
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      if (statusCode >= 200 && statusCode < 300) {
-        return data.gtmOnSuccess();
-      } else {
-        return data.gtmOnFailure();
-      }
+      return statusCode >= 200 && statusCode < 300 ? data.gtmOnSuccess() : data.gtmOnFailure();
     },
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     JSON.stringify([requestBody])
   );
+}
+
+/*==============================================================================
+  Vendor related functions
+==============================================================================*/
+
+function isCookieIdValid(cookieId) {
+  return makeString(cookieId).match('^[-\\d]\\d{17,19}$') !== null;
+}
+
+function isClickIdValid(clickId) {
+  return makeString(clickId).match('^[0-9]+\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+$') !== null;
 }
 
 /*==============================================================================

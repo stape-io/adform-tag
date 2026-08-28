@@ -431,7 +431,6 @@ const encodeUriComponent = require('encodeUriComponent');
 const getAllEventData = require('getAllEventData');
 const getEventData = require('getEventData');
 const getCookieValues = require('getCookieValues');
-const getRemoteAddress = require('getRemoteAddress');
 const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
 const JSON = require('JSON');
@@ -465,14 +464,14 @@ if (data.type === 'page_view') {
         httpOnly: false
       };
       if (data.expiration > 0) options['max-age'] = data.expiration;
-      if (cookieId) setCookie('adfuid', cookieId, options, false);
-      if (clickId) setCookie('_adfcd', clickId, options, false);
+      if (isCookieIdValid(cookieId)) setCookie('adfuid', cookieId, options, false);
+      if (isClickIdValid(clickId)) setCookie('_adfcd', clickId, options, false);
     }
   }
   return data.gtmOnSuccess();
 } else {
-  const adf_uid = data.clickId || getCookieValues('adfuid')[0] || ''; // Also know as "Adform third-party cookie ID"
-  const adf_cd = data.adformClickId || getCookieValues('_adfcd')[0] || '';
+  const cookieId = data.clickId || getCookieValues('adfuid')[0] || ''; // Also know as "Adform third-party cookie ID"
+  const clickId = data.adformClickId || getCookieValues('_adfcd')[0] || '';
   const userData = makeTableMap(data.userDataList || [], 'key', 'value') || {};
 
   const requestUrl =
@@ -483,16 +482,16 @@ if (data.type === 'page_view') {
     '/trackingpoints/';
   const requestBody = {
     name: data.name,
-    pageUrl: data.pageLocation || getEventData('page_location'),
-    refererUrl: data.pageReferrer || getEventData('page_referrer'),
+    pageUrl: data.pageLocation || eventData.page_location,
+    refererUrl: data.pageReferrer || eventData.page_referrer,
     identity: {
-      cookieId: adf_uid,
-      clickId: adf_cd
+      cookieId: isCookieIdValid(cookieId) ? cookieId : '',
+      clickId: isClickIdValid(clickId) ? clickId : ''
     },
     userContext: {
-      userAgent: userData.user_agent || getRequestHeader('User-Agent'),
-      userIp: userData.client_ip || getRemoteAddress(),
-      browserLanguage: userData.browser_language || getEventData('language')
+      userAgent: userData.user_agent || eventData.user_agent,
+      userIp: userData.client_ip || eventData.ip_override,
+      browserLanguage: userData.browser_language || eventData.language
     }
   };
   const mobileDeviceId = data.mobileAdvertisingId || eventData['x-ga-resettable_device_id'];
@@ -507,15 +506,23 @@ if (data.type === 'page_view') {
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      if (statusCode >= 200 && statusCode < 300) {
-        return data.gtmOnSuccess();
-      } else {
-        return data.gtmOnFailure();
-      }
+      return statusCode >= 200 && statusCode < 300 ? data.gtmOnSuccess() : data.gtmOnFailure();
     },
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     JSON.stringify([requestBody])
   );
+}
+
+/*==============================================================================
+  Vendor related functions
+==============================================================================*/
+
+function isCookieIdValid(cookieId) {
+  return makeString(cookieId).match('^[-\\d]\\d{17,19}$') !== null;
+}
+
+function isClickIdValid(clickId) {
+  return makeString(clickId).match('^[0-9]+\\.[a-zA-Z0-9_-]+\\.[a-zA-Z0-9_-]+$') !== null;
 }
 
 /*==============================================================================
@@ -748,60 +755,8 @@ ___SERVER_PERMISSIONS___
                     "string": "referer"
                   }
                 ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "headerName"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "User-Agent"
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "headerName"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "Forwarded"
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "headerName"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "X-Forwarded-For"
-                  }
-                ]
               }
             ]
-          }
-        },
-        {
-          "key": "remoteAddressAllowed",
-          "value": {
-            "type": 8,
-            "boolean": true
           }
         },
         {
@@ -881,14 +836,428 @@ ___SERVER_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+- name: '[Early Exit] Calls gtmOnSuccess and stops when consent is required but not
+    given'
+  code: |-
+    mockData.adStorageConsent = 'required';
+    setEventData({ 'x-ga-gcs': 'G100' });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEmpty();
+    assertApi('sendHttpRequest').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Early Exit] Proceeds normally when consent is required and given via x-ga-gcs'
+  code: |-
+    mockData.adStorageConsent = 'required';
+    setEventData({ 'x-ga-gcs': 'G110' });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isNotEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Early Exit] Proceeds normally when consent is required and given via consent_state'
+  code: |-
+    mockData.adStorageConsent = 'required';
+    setEventData({ consent_state: { ad_storage: true } });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isNotEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Early Exit] Calls gtmOnSuccess and stops when the URL matches the GTM preview
+    endpoint'
+  code: |-
+    setEventData({ page_location: 'https://gtm-msr.appspot.com/collect' });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Skips cookie setting when no URL is available'
+  code: |-
+    setEventData({ page_location: undefined, page_referrer: undefined });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Sets both cookies when the cookie ID and click ID are valid'
+  code: |-
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: 'adfuid', value: VALID_COOKIE_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false },
+      { name: '_adfcd', value: VALID_CLICK_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Sets only the cookie ID when the click ID parameter is absent'
+  code: |-
+    setEventData({ page_location: 'https://www.example.com/landing?adfcookieid=' + VALID_COOKIE_ID });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: 'adfuid', value: VALID_COOKIE_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Sets only the click ID when the cookie ID parameter is absent'
+  code: |-
+    setEventData({ page_location: 'https://www.example.com/landing?adfcd=' + VALID_CLICK_ID });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: '_adfcd', value: VALID_CLICK_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Does not set an invalid cookie ID even when the click ID is valid'
+  code: |-
+    setEventData({
+      page_location: 'https://www.example.com/landing?adfcookieid=' + INVALID_ID + '&adfcd=' + VALID_CLICK_ID
+    });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: '_adfcd', value: VALID_CLICK_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Does not set an invalid click ID even when the cookie ID is valid'
+  code: |-
+    setEventData({
+      page_location: 'https://www.example.com/landing?adfcookieid=' + VALID_COOKIE_ID + '&adfcd=' + INVALID_ID
+    });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: 'adfuid', value: VALID_COOKIE_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Sets no cookies when both the cookie ID and click ID are invalid'
+  code: |-
+    setEventData({
+      page_location: 'https://www.example.com/landing?adfcookieid=' + INVALID_ID + '&adfcd=' + INVALID_ID
+    });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Uses custom URL parameter names when configured'
+  code: |-
+    mockData.clickIdParameterName = 'myCookieParam';
+    mockData.adformClickIdParameterName = 'myClickParam';
+    setEventData({
+      page_location: 'https://www.example.com/landing?myCookieParam=' + VALID_COOKIE_ID + '&myClickParam=' + VALID_CLICK_ID
+    });
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls).isEqualTo([
+      { name: 'adfuid', value: VALID_COOKIE_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false },
+      { name: '_adfcd', value: VALID_CLICK_ID, options: EXPECTED_COOKIE_OPTIONS, noEncode: false }
+    ]);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Applies max-age only when expiration is greater than zero'
+  code: |-
+    [
+      { expiration: 0, expectMaxAge: false },
+      { expiration: 3600, expectMaxAge: true }
+    ].forEach(scenario => {
+      setCookieCalls = [];
+      mockData.expiration = scenario.expiration;
+
+      runCode(mockData);
+
+      assertThat(setCookieCalls[0].options.hasOwnProperty('max-age')).isEqualTo(scenario.expectMaxAge);
+      if (scenario.expectMaxAge) {
+        assertThat(setCookieCalls[0].options['max-age']).isEqualTo(scenario.expiration);
+      }
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: '[Page View] Uses the configured cookie domain instead of auto-detecting it'
+  code: |-
+    mockData.cookieDomain = 'mysite.com';
+
+    runCode(mockData);
+
+    assertThat(setCookieCalls[0].options.domain).isEqualTo('mysite.com');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Builds the request URL, options and payload correctly'
+  code: |-
+    setTrackEventMockData();
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      assertThat(url).isEqualTo('https://track.adform.net/v2/sitetracking/123456/trackingpoints/');
+      assertThat(options.method).isEqualTo('POST');
+      assertThat(options.headers['Content-Type']).isEqualTo('application/json');
+
+      const parsedBody = JSON.parse(body);
+      assertThat(parsedBody).isEqualTo([{
+        name: 'purchase',
+        pageUrl: 'https://example.com/product',
+        refererUrl: 'https://example.com/',
+        identity: {
+          cookieId: VALID_COOKIE_ID,
+          clickId: VALID_CLICK_ID
+        },
+        userContext: {
+          userAgent: 'Mozilla/5.0 (default)',
+          userIp: '203.0.113.5',
+          browserLanguage: 'en-US'
+        }
+      }]);
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Falls back to cookie values when override fields are not provided'
+  code: |-
+    setTrackEventMockData();
+    mockData.clickId = undefined;
+    mockData.adformClickId = undefined;
+
+    mock('getCookieValues', (cookieName) => {
+      if (cookieName === 'adfuid') return [VALID_COOKIE_ID];
+      if (cookieName === '_adfcd') return [VALID_CLICK_ID];
+      return [];
+    });
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body)[0];
+      assertThat(parsedBody.identity).isEqualTo({ cookieId: VALID_COOKIE_ID, clickId: VALID_CLICK_ID });
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Excludes invalid override IDs from the identity payload'
+  code: |-
+    setTrackEventMockData();
+    mockData.clickId = INVALID_ID;
+    mockData.adformClickId = INVALID_ID;
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body)[0];
+      assertThat(parsedBody.identity).isEqualTo({ cookieId: '', clickId: '' });
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Includes the mobile advertising ID unless it is the all-zero
+    placeholder'
+  code: |-
+    [
+      { deviceId: '00000000-0000-0000-0000-000000000000', expectPresent: false },
+      { deviceId: 'ABCD1234-EFGH-5678-IJKL-9876543210MN', expectPresent: true }
+    ].forEach(scenario => {
+      setTrackEventMockData();
+      mockData.mobileAdvertisingId = scenario.deviceId;
+
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        const parsedBody = JSON.parse(body)[0];
+        if (scenario.expectPresent) {
+          assertThat(parsedBody.identity.advertisingId).isEqualTo(scenario.deviceId);
+        } else {
+          assertThat(parsedBody.identity.hasOwnProperty('advertisingId')).isFalse();
+        }
+        callback(200, {}, '');
+      });
+
+      runCode(mockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: '[Track Event] Includes compliance and variables tables only when provided'
+  code: |-
+    setTrackEventMockData();
+    mockData.compliance = [
+      { key: 'gdpr', value: '1' },
+      { key: 'usPrivacy', value: '1YNN' }
+    ];
+    mockData.variables = [
+      { key: 'orderId', value: 'ORD123' }
+    ];
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body)[0];
+      assertThat(parsedBody.compliance).isEqualTo({ gdpr: '1', usPrivacy: '1YNN' });
+      assertThat(parsedBody.variables).isEqualTo({ orderId: 'ORD123' });
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Maps user context from the user data table before falling back
+    to event data'
+  code: |-
+    setTrackEventMockData();
+    mockData.userDataList = [
+      { key: 'user_agent', value: 'CustomUA/1_0' },
+      { key: 'client_ip', value: '198.51.100.9' },
+      { key: 'browser_language', value: 'fr-FR' }
+    ];
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body)[0];
+      assertThat(parsedBody.userContext).isEqualTo({
+        userAgent: 'CustomUA/1_0',
+        userIp: '198.51.100.9',
+        browserLanguage: 'fr-FR'
+      });
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Track Event] Calls gtmOnFailure on a non-2xx response'
+  code: |-
+    setTrackEventMockData();
+
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      callback(500, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertApi('gtmOnSuccess').wasNotCalled();
+    assertApi('gtmOnFailure').wasCalled();
+- name: '[Track Event] Calls gtmOnSuccess for every status code in the 2xx range'
+  code: |-
+    [200, 250, 299].forEach(statusCode => {
+      setTrackEventMockData();
+
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        callback(statusCode, {}, '');
+      });
+
+      runCode(mockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+setup: |-
+  const JSON = require('JSON');
+  const Object = require('Object');
+
+  const VALID_COOKIE_ID = '123456789012345678';
+  const VALID_CLICK_ID = '1744980296.yLftULy3pk-ejHaAo-jqJg.MTE1Mjg4NywxMzg3OTkz';
+  const INVALID_ID = 'not-a-valid-id';
+
+  const EXPECTED_COOKIE_OPTIONS = {
+    domain: 'example.com',
+    path: '/',
+    samesite: 'none',
+    secure: true,
+    httpOnly: false
+  };
+
+  const assign = (target, source) => {
+    if (!source) return target;
+    const keys = Object.keys(source);
+    keys.forEach((key) => { target[key] = source[key]; });
+    return target;
+  };
+
+  const DEFAULT_EVENT_DATA = {
+    page_location: 'https://www.example.com/landing?adfcookieid=' + VALID_COOKIE_ID + '&adfcd=' + VALID_CLICK_ID,
+    page_referrer: 'https://referrer.example.com/',
+    'x-ga-gcs': 'G110',
+    user_agent: 'Mozilla/5.0 (default)',
+    ip_override: '203.0.113.5',
+    language: 'en-US',
+    'x-ga-resettable_device_id': '00000000-0000-0000-0000-000000000000'
+  };
+
+  const setEventData = (overrides) => {
+    const eventDataMock = assign(assign({}, DEFAULT_EVENT_DATA), overrides || {});
+    mock('getAllEventData', () => eventDataMock);
+    mock('getEventData', (key) => eventDataMock[key]);
+  };
+
+  let setCookieCalls = [];
+  mock('setCookie', (name, value, options, noEncode) => {
+    setCookieCalls.push({ name: name, value: value, options: options, noEncode: noEncode });
+  });
+
+  mock('getContainerVersion', () => ({ debugMode: false, previewMode: false }));
+  mock('getRequestHeader', () => undefined);
+  mock('getCookieValues', () => []);
+  mock('computeEffectiveTldPlusOne', () => 'example.com');
+  mock('sendHttpRequest', (url, callback, options, body) => {
+    callback(200, {}, '');
+  });
+
+  setEventData();
+
+  const mockData = {
+    type: 'page_view',
+    clickIdParameterName: 'adfcookieid',
+    adformClickIdParameterName: 'adfcd',
+    cookieDomain: 'auto',
+    cookieSameSite: 'none',
+    expiration: 0,
+    adStorageConsent: 'optional',
+    trackingDomain: 'track.adform.net',
+    trackingsetupid: '123456',
+    name: 'purchase',
+    clickId: VALID_COOKIE_ID,
+    adformClickId: VALID_CLICK_ID,
+    mobileAdvertisingId: undefined,
+    compliance: undefined,
+    variables: undefined,
+    userDataList: undefined,
+    pageLocation: undefined,
+    pageReferrer: undefined
+  };
+
+  const setTrackEventMockData = () => {
+    mockData.type = 'trackEvent';
+    setEventData({
+      page_location: 'https://example.com/product',
+      page_referrer: 'https://example.com/'
+    });
+  };
 
 
 ___NOTES___
 
-2026-08-17 Change Notes:
- - Added more controls to cookie settings (SameSite and Domain).
- - Increase the default cookie expiration from 30 days to 60 days.
+2026-08-27 Change Notes:
+ - Validate the cookie ID and click ID (format checks) before storing them in cookies or including them in TrackEvent requests, preventing malformed values from being saved or sent to Adform.
+ - Source TrackEvent user agent and IP from event data instead of request headers/getRemoteAddress.
+ - Add unit tests covering consent handling, cookie ID/click ID validation, and TrackEvent request payload construction.
 
 2026-05-25 Change Notes:
  - Logging removal.
