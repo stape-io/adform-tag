@@ -1,6 +1,8 @@
 homepage: 'https://stape.io/'
 documentation: 'https://github.com/stape-io/adform-tag'
 versions:
+  - sha: 4eba6f59df2d362097ec4c384789d277c629c260
+    changeNotes: Add validation to Click ID and Cookie ID cookies. Add unit tests.
   - sha: 26968487a2bc5f2e4b90d8702dfd97ee131b559e
     changeNotes: Add more controls to cookie settings.
   - sha: 11ac843e135cb78214f5f6683aab8de24b723a84
